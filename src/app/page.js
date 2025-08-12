@@ -389,7 +389,76 @@ export default function Home() {
   const N8N_WEBHOOK =
     "https://wsi-utopiads.app.n8n.cloud/webhook/47752a0d-902c-4d24-ae34-48a1cf1d7909";
 
-  // ... (keep all your existing functions: normalizeDrive, textToPdfFile, sendToWebhook, handleSubmit)
+  function normalizeDrive(link) {
+    try {
+      const u = new URL(link);
+      if (!u.hostname.includes("drive.google.com")) return link;
+
+      if (u.pathname.startsWith("/uc") && u.searchParams.get("id")) return link;
+
+      const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
+      if (m && m[1])
+        return `https://drive.google.com/uc?export=download&id=${m[1]}`;
+
+      const id = u.searchParams.get("id");
+      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
+    } catch {}
+    return link;
+  }
+
+  async function textToPdfFile(text, filename = "document.pdf") {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const margin = 50;
+    const { width, height } = page.getSize();
+    const maxWidth = width - margin * 2;
+
+    const words = text.replace(/\r\n/g, "\n").split(/\s+/);
+    let line = "",
+      y = height - margin;
+
+    const widthOf = (s) => font.widthOfTextAtSize(s, fontSize);
+
+    for (const w of words) {
+      const test = line ? `${line} ${w}` : w;
+      if (widthOf(test) > maxWidth) {
+        page.drawText(line, {
+          x: margin,
+          y,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+        y -= fontSize * 1.4;
+        line = w;
+      } else {
+        line = test;
+      }
+    }
+    if (line)
+      page.drawText(line, {
+        x: margin,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+
+    const bytes = await pdf.save();
+    return new File([bytes], filename, { type: "application/pdf" });
+  }
+
+  async function sendToWebhook(formData) {
+    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: formData });
+    const text = await r.text();
+    try {
+      return { ok: r.ok, data: JSON.parse(text) };
+    } catch {
+      return { ok: r.ok, data: { raw: text } };
+    }
+  }
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -397,6 +466,64 @@ export default function Home() {
       setSelectedFile(file);
     }
   };
+
+  async function handleSubmit(kind) {
+    setLoading(true);
+    setResp(null);
+    try {
+      const form = new FormData();
+
+      if (kind === "url") {
+        if (!url) throw new Error("No URL provided");
+        const normalized = normalizeDrive(url);
+        const res = await fetch(normalized);
+        if (!res.ok) throw new Error(`Failed to fetch file (${res.status})`);
+
+        const buf = await res.arrayBuffer();
+        const ct = res.headers.get("content-type") || "";
+        const filename = normalized.split("/").pop().split("?")[0] || "file";
+
+        let file;
+        if (ct.includes("application/pdf") || filename.endsWith(".pdf")) {
+          file = new File(
+            [buf],
+            filename.endsWith(".pdf") ? filename : `${filename}.pdf`,
+            { type: "application/pdf" }
+          );
+        } else if (ct.includes("text/plain") || filename.endsWith(".txt")) {
+          const text = new TextDecoder().decode(buf);
+          file = await textToPdfFile(
+            text,
+            filename.replace(/\.txt$/i, "") + ".pdf"
+          );
+        } else {
+          throw new Error(`Unsupported content type: ${ct}`);
+        }
+        form.append("file", file, file.name);
+        form.append("source", normalized);
+      } else {
+        const file = fileRef.current?.files?.[0];
+        if (!file) throw new Error("No file selected");
+
+        let finalFile = file;
+        if (file.type !== "application/pdf" && file.name.endsWith(".txt")) {
+          const text = await file.text();
+          finalFile = await textToPdfFile(
+            text,
+            file.name.replace(/\.txt$/i, "") + ".pdf"
+          );
+        }
+        form.append("file", finalFile, finalFile.name);
+      }
+
+      const result = await sendToWebhook(form);
+      setResp(result);
+    } catch (e) {
+      setResp({ ok: false, data: { error: e.message } });
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
