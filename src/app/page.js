@@ -475,32 +475,12 @@ export default function Home() {
 
       if (kind === "url") {
         if (!url) throw new Error("No URL provided");
-        const normalized = normalizeDrive(url);
-        const res = await fetch(normalized);
-        if (!res.ok) throw new Error(`Failed to fetch file (${res.status})`);
-
-        const buf = await res.arrayBuffer();
-        const ct = res.headers.get("content-type") || "";
-        const filename = normalized.split("/").pop().split("?")[0] || "file";
-
-        let file;
-        if (ct.includes("application/pdf") || filename.endsWith(".pdf")) {
-          file = new File(
-            [buf],
-            filename.endsWith(".pdf") ? filename : `${filename}.pdf`,
-            { type: "application/pdf" }
-          );
-        } else if (ct.includes("text/plain") || filename.endsWith(".txt")) {
-          const text = new TextDecoder().decode(buf);
-          file = await textToPdfFile(
-            text,
-            filename.replace(/\.txt$/i, "") + ".pdf"
-          );
-        } else {
-          throw new Error(`Unsupported content type: ${ct}`);
-        }
-        form.append("file", file, file.name);
-        form.append("source", normalized);
+        const normalized = normalizeDrive(url); // keep your normalizer
+        const form = new FormData();
+        form.append("url", normalized); // <-- send only the URL
+        const result = await sendToWebhook(form);
+        setResp(result);
+        return;
       } else {
         const file = fileRef.current?.files?.[0];
         if (!file) throw new Error("No file selected");
