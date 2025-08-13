@@ -385,7 +385,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null);
   const fileRef = useRef(null);
 
-  // Your n8n webhook URL
+  // Your n8n webhook URL (Webhook node's Field Name for Binary Data = "file")
   const N8N_WEBHOOK =
     "https://wsi-utopiads.app.n8n.cloud/webhook/937e979c-46d4-469f-9d3c-98283cfbb628";
 
@@ -430,15 +430,20 @@ export default function Home() {
     return new File([bytes], filename, { type: "application/pdf" });
   }
 
-  async function sendForm(form, fileName) {
+  async function sendForm(file) {
+    const form = new FormData();
+    // This field name must match "Field Name for Binary Data" in n8n Webhook node
+    form.append("file", file, file.name);
+
     const r = await fetch(N8N_WEBHOOK, {
       method: "POST",
-      headers: { "X-File-Name": fileName || "unknown" },
       body: form,
     });
+
     const headers = Object.fromEntries(r.headers.entries());
     const text = await r.text();
     console.log("Webhook response:", { status: r.status, headers, text });
+
     try {
       return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
@@ -449,9 +454,6 @@ export default function Home() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0] || null;
     setSelectedFile(file);
-    if (fileRef.current) {
-      fileRef.current.value = "";
-    }
   };
 
   async function handleSubmit() {
@@ -475,11 +477,7 @@ export default function Home() {
         );
       }
 
-      const form = new FormData();
-      form.append("file", finalFile, finalFile.name);
-      form.append("document", finalFile, finalFile.name);
-
-      const result = await sendForm(form, finalFile.name);
+      const result = await sendForm(finalFile);
       setResp(result);
     } catch (e) {
       setResp({
@@ -508,27 +506,23 @@ export default function Home() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Upload File
               </label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
-                <div className="space-y-1 text-center">
-                  <input
-                    id="file-upload"
-                    ref={fileRef}
-                    type="file"
-                    accept=".pdf,.txt"
-                    onChange={handleFileChange}
-                  />
-                  {selectedFile && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-gray-700">
-                        Selected file: {selectedFile.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                      </p>
-                    </div>
-                  )}
+              <input
+                id="file-upload"
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.txt"
+                onChange={handleFileChange}
+              />
+              {selectedFile && (
+                <div className="mt-2">
+                  <p className="text-sm font-medium text-gray-700">
+                    Selected file: {selectedFile.name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
                 </div>
-              </div>
+              )}
             </div>
             <button
               onClick={handleSubmit}
