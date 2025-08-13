@@ -380,34 +380,14 @@ import { useState, useRef } from "react";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export default function Home() {
-  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState(null);
-  const [activeTab, setActiveTab] = useState("url");
   const [selectedFile, setSelectedFile] = useState(null);
   const fileRef = useRef(null);
 
-  // IMPORTANT: point to your own API relay to bypass CORS
+  // Your n8n webhook URL
   const N8N_WEBHOOK =
     "https://wsi-utopiads.app.n8n.cloud/webhook/937e979c-46d4-469f-9d3c-98283cfbb628";
-
-  function normalizeDrive(link) {
-    try {
-      const u = new URL(link);
-      if (!u.hostname.includes("drive.google.com")) return link;
-      if (u.pathname.startsWith("/uc") && u.searchParams.get("id")) return link;
-
-      const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
-      if (m && m[1])
-        return `https://drive.google.com/uc?export=download&id=${m[1]}`;
-
-      const id = u.searchParams.get("id");
-      if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
-    } catch {
-      return link;
-    }
-    return link;
-  }
 
   async function textToPdfFile(text, filename = "document.pdf") {
     const pdf = await PDFDocument.create();
@@ -450,35 +430,10 @@ export default function Home() {
     return new File([bytes], filename, { type: "application/pdf" });
   }
 
-  async function sendJson(payload) {
-    console.log("Sending JSON payload to webhook:", payload);
-    const r = await fetch(N8N_WEBHOOK, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    const headers = Object.fromEntries(r.headers.entries());
-    const text = await r.text();
-    console.log("Webhook response:", { status: r.status, headers, text });
-    try {
-      return { ok: r.ok, status: r.status, data: JSON.parse(text) };
-    } catch {
-      return { ok: r.ok, status: r.status, data: { raw: text } };
-    }
-  }
-
   async function sendForm(form, fileName) {
-    for (let [key, value] of form.entries()) {
-      console.log(`FormData entry: ${key}=${value.name || value}`);
-    }
     const r = await fetch(N8N_WEBHOOK, {
       method: "POST",
-      headers: {
-        "X-File-Name": fileName || "unknown", // Custom header to help n8n
-      },
+      headers: { "X-File-Name": fileName || "unknown" },
       body: form,
     });
     const headers = Object.fromEntries(r.headers.entries());
@@ -494,69 +449,38 @@ export default function Home() {
   const handleFileChange = (e) => {
     const file = e.target.files?.[0] || null;
     setSelectedFile(file);
-    if (file && fileRef.current) {
-      fileRef.current.value = ""; // Clear the input after selecting
-    }
-  };
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setUrl(""); // Clear URL
-    setSelectedFile(null); // Clear file
     if (fileRef.current) {
-      fileRef.current.value = ""; // Clear file input
+      fileRef.current.value = "";
     }
-    setResp(null); // Clear response
   };
 
-  async function handleSubmit(kind) {
+  async function handleSubmit() {
     setLoading(true);
     setResp(null);
     try {
-      if (kind === "url") {
-        if (!url) throw new Error("No URL provided");
-        const normalized = normalizeDrive(url);
-        console.log("Sending JSON to relay:", {
-          url: normalized,
-          source: "client",
-        });
-        const result = await sendJson({ url: normalized, source: "client" });
-        setResp(result);
-      } else {
-        if (!selectedFile) throw new Error("No file selected");
-        if (selectedFile.size > 10 * 1024 * 1024) {
-          throw new Error("File size exceeds 10MB limit");
-        }
-
-        let finalFile = selectedFile;
-        if (
-          selectedFile.type !== "application/pdf" &&
-          /\.txt$/i.test(selectedFile.name)
-        ) {
-          const text = await selectedFile.text();
-          finalFile = await textToPdfFile(
-            text,
-            selectedFile.name.replace(/\.txt$/i, "") + ".pdf"
-          );
-        }
-
-        console.log("Final file:", {
-          name: finalFile.name,
-          type: finalFile.type,
-          size: finalFile.size,
-        });
-
-        const form = new FormData();
-        form.append("file", finalFile, finalFile.name); // Primary field name
-        form.append("document", finalFile, finalFile.name); // Fallback field name for n8n compatibility
-        console.log("Sending multipart to relay:", {
-          name: finalFile.name,
-          type: finalFile.type,
-          size: finalFile.size,
-        });
-        const result = await sendForm(form, finalFile.name);
-        setResp(result);
+      if (!selectedFile) throw new Error("No file selected");
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        throw new Error("File size exceeds 10MB limit");
       }
+
+      let finalFile = selectedFile;
+      if (
+        selectedFile.type !== "application/pdf" &&
+        /\.txt$/i.test(selectedFile.name)
+      ) {
+        const text = await selectedFile.text();
+        finalFile = await textToPdfFile(
+          text,
+          selectedFile.name.replace(/\.txt$/i, "") + ".pdf"
+        );
+      }
+
+      const form = new FormData();
+      form.append("file", finalFile, finalFile.name);
+      form.append("document", finalFile, finalFile.name);
+
+      const result = await sendForm(form, finalFile.name);
+      setResp(result);
     } catch (e) {
       setResp({
         ok: false,
@@ -576,125 +500,44 @@ export default function Home() {
             <h1 className="text-3xl font-bold text-gray-800 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Utility Bill Uploader
             </h1>
-            <p className="mt-2 text-gray-600">
-              Upload a PDF/TXT or paste a link (Google Drive supported)
-            </p>
+            <p className="mt-2 text-gray-600">Upload a PDF/TXT file</p>
           </div>
 
-          <div className="flex border-b border-gray-200 mb-6">
-            <button
-              className={`py-2 px-4 font-medium text-sm focus:outline-none ${
-                activeTab === "url"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => handleTabChange("url")}
-            >
-              Submit Link
-            </button>
-            <button
-              className={`py-2 px-4 font-medium text-sm focus:outline-none ${
-                activeTab === "file"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => handleTabChange("file")}
-            >
-              Upload File
-            </button>
-          </div>
-
-          {activeTab === "url" && (
-            <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="url"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Document URL
-                </label>
-                <input
-                  id="url"
-                  type="text"
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="Paste PDF/TXT/Drive link"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                />
-              </div>
-              <button
-                onClick={() => handleSubmit("url")}
-                disabled={loading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {loading ? "Processing..." : "Submit Link"}
-              </button>
-            </div>
-          )}
-
-          {activeTab === "file" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Upload File
-                </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
-                  <div className="space-y-1 text-center">
-                    <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
-                      stroke="currentColor"
-                      fill="none"
-                      viewBox="0 0 48 48"
-                    >
-                      <path
-                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <div className="flex text-sm text-gray-600">
-                      <label
-                        htmlFor="file-upload"
-                        className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
-                      >
-                        <span>Upload a file</span>
-                        <input
-                          id="file-upload"
-                          ref={fileRef}
-                          type="file"
-                          accept=".pdf,.txt"
-                          className="sr-only"
-                          onChange={handleFileChange}
-                        />
-                      </label>
-                      <p className="pl-1">or drag and drop</p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Upload File
+              </label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                <div className="space-y-1 text-center">
+                  <input
+                    id="file-upload"
+                    ref={fileRef}
+                    type="file"
+                    accept=".pdf,.txt"
+                    onChange={handleFileChange}
+                  />
+                  {selectedFile && (
+                    <div className="mt-2">
+                      <p className="text-sm font-medium text-gray-700">
+                        Selected file: {selectedFile.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      PDF or TXT up to 10MB
-                    </p>
-                    {selectedFile && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium text-gray-700">
-                          Selected file: {selectedFile.name}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={() => handleSubmit("file")}
-                disabled={loading || !selectedFile}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {loading ? "Uploading..." : "Upload File"}
-              </button>
             </div>
-          )}
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !selectedFile}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-70"
+            >
+              {loading ? "Uploading..." : "Upload File"}
+            </button>
+          </div>
 
           {resp && (
             <div className="mt-8">
@@ -706,54 +549,6 @@ export default function Home() {
                   {JSON.stringify(resp, null, 2)}
                 </pre>
               </div>
-              {resp.ok ? (
-                <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-5 w-5 text-green-400"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="atanh"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-green-800">
-                        Success! Your file/link has been processed.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 p-4 bg-red-50 rounded-lg">
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <svg
-                        className="h-5 w-5 text-red-400"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-red-800">
-                        Error:{" "}
-                        {resp.data?.error || `HTTP ${resp.status || "network"}`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
