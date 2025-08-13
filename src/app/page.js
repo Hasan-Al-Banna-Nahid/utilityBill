@@ -387,13 +387,12 @@ export default function Home() {
   const fileRef = useRef(null);
 
   const N8N_WEBHOOK =
-    "https://wsi-utopiads.app.n8n.cloud/webhook/70d88c37-80fe-4d33-b8ac-1849b3ef46a1";
+    "https://wsi-utopiads.app.n8n.cloud/webhook/937e979c-46d4-469f-9d3c-98283cfbb628";
 
   function normalizeDrive(link) {
     try {
       const u = new URL(link);
       if (!u.hostname.includes("drive.google.com")) return link;
-
       if (u.pathname.startsWith("/uc") && u.searchParams.get("id")) return link;
 
       const m = u.pathname.match(/\/file\/d\/([^/]+)\//);
@@ -416,8 +415,8 @@ export default function Home() {
     const maxWidth = width - margin * 2;
 
     const words = text.replace(/\r\n/g, "\n").split(/\s+/);
-    let line = "",
-      y = height - margin;
+    let line = "";
+    let y = height - margin;
 
     const widthOf = (s) => font.widthOfTextAtSize(s, fontSize);
 
@@ -450,8 +449,30 @@ export default function Home() {
     return new File([bytes], filename, { type: "application/pdf" });
   }
 
-  async function sendToWebhook(formData) {
-    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: formData });
+  async function sendJson(payload) {
+    const r = await fetch(N8N_WEBHOOK, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/plain, */*",
+      },
+      body: JSON.stringify(payload),
+      mode: "cors",
+    });
+    const text = await r.text();
+    try {
+      return { ok: r.ok, data: JSON.parse(text) };
+    } catch {
+      return { ok: r.ok, data: { raw: text } };
+    }
+  }
+
+  async function sendForm(form) {
+    const r = await fetch(N8N_WEBHOOK, {
+      method: "POST",
+      body: form, // do NOT set Content-Type manually
+      mode: "cors",
+    });
     const text = await r.text();
     try {
       return { ok: r.ok, data: JSON.parse(text) };
@@ -461,45 +482,48 @@ export default function Home() {
   }
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
   };
 
   async function handleSubmit(kind) {
     setLoading(true);
     setResp(null);
     try {
-      const form = new FormData();
-
       if (kind === "url") {
         if (!url) throw new Error("No URL provided");
-        const normalized = normalizeDrive(url); // keep your normalizer
-        const form = new FormData();
-        form.append("url", normalized); // <-- send only the URL
-        const result = await sendToWebhook(form);
+        const normalized = normalizeDrive(url);
+        console.log("Sending JSON to n8n:", {
+          url: normalized,
+          source: "client",
+        });
+        const result = await sendJson({ url: normalized }); // n8n → items[0].json.url
         setResp(result);
-        return;
       } else {
         const file = fileRef.current?.files?.[0];
         if (!file) throw new Error("No file selected");
 
         let finalFile = file;
-        if (file.type !== "application/pdf" && file.name.endsWith(".txt")) {
+        if (file.type !== "application/pdf" && /\.txt$/i.test(file.name)) {
           const text = await file.text();
           finalFile = await textToPdfFile(
             text,
             file.name.replace(/\.txt$/i, "") + ".pdf"
           );
         }
-        form.append("file", finalFile, finalFile.name);
-      }
 
-      const result = await sendToWebhook(form);
-      setResp(result);
+        const form = new FormData();
+        form.append("file", finalFile, finalFile.name); // n8n → items[0].binary.file
+        console.log("Sending multipart to n8n:", {
+          name: finalFile.name,
+          type: finalFile.type,
+          size: finalFile.size,
+        });
+        const result = await sendForm(form);
+        setResp(result);
+      }
     } catch (e) {
-      setResp({ ok: false, data: { error: e.message } });
+      setResp({ ok: false, data: { error: e?.message || String(e) } });
     } finally {
       setLoading(false);
     }
@@ -518,7 +542,6 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Tab Navigation */}
           <div className="flex border-b border-gray-200 mb-6">
             <button
               className={`py-2 px-4 font-medium text-sm focus:outline-none ${
@@ -542,7 +565,6 @@ export default function Home() {
             </button>
           </div>
 
-          {/* URL Tab Content */}
           {activeTab === "url" && (
             <div className="space-y-4">
               <div>
@@ -581,7 +603,7 @@ export default function Home() {
                         r="10"
                         stroke="currentColor"
                         strokeWidth="4"
-                      ></circle>
+                      />
                       <path
                         className="opacity-75"
                         fill="currentColor"
@@ -597,7 +619,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* File Tab Content */}
           {activeTab === "file" && (
             <div className="space-y-4">
               <div>
@@ -673,7 +694,7 @@ export default function Home() {
                         r="10"
                         stroke="currentColor"
                         strokeWidth="4"
-                      ></circle>
+                      />
                       <path
                         className="opacity-75"
                         fill="currentColor"
