@@ -451,7 +451,7 @@ export default function Home() {
   }
 
   async function sendJson(payload) {
-    console.log("Sending payload to webhook:", payload);
+    console.log("Sending JSON payload to webhook:", payload);
     const r = await fetch(N8N_WEBHOOK, {
       method: "POST",
       headers: {
@@ -460,8 +460,9 @@ export default function Home() {
       },
       body: JSON.stringify(payload),
     });
+    const headers = Object.fromEntries(r.headers.entries());
     const text = await r.text();
-    console.log("Webhook response:", { status: r.status, text });
+    console.log("Webhook response:", { status: r.status, headers, text });
     try {
       return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
@@ -469,13 +470,20 @@ export default function Home() {
     }
   }
 
-  async function sendForm(form) {
+  async function sendForm(form, fileName) {
     for (let [key, value] of form.entries()) {
       console.log(`FormData entry: ${key}=${value.name || value}`);
     }
-    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: form });
+    const r = await fetch(N8N_WEBHOOK, {
+      method: "POST",
+      headers: {
+        "X-File-Name": fileName || "unknown", // Custom header to help n8n
+      },
+      body: form,
+    });
+    const headers = Object.fromEntries(r.headers.entries());
     const text = await r.text();
-    console.log("Webhook response:", { status: r.status, text });
+    console.log("Webhook response:", { status: r.status, headers, text });
     try {
       return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
@@ -516,6 +524,9 @@ export default function Home() {
         setResp(result);
       } else {
         if (!selectedFile) throw new Error("No file selected");
+        if (selectedFile.size > 10 * 1024 * 1024) {
+          throw new Error("File size exceeds 10MB limit");
+        }
 
         let finalFile = selectedFile;
         if (
@@ -529,14 +540,21 @@ export default function Home() {
           );
         }
 
+        console.log("Final file:", {
+          name: finalFile.name,
+          type: finalFile.type,
+          size: finalFile.size,
+        });
+
         const form = new FormData();
-        form.append("file", finalFile, finalFile.name); // Adjust field name if n8n expects something else
+        form.append("file", finalFile, finalFile.name); // Primary field name
+        form.append("document", finalFile, finalFile.name); // Fallback field name for n8n compatibility
         console.log("Sending multipart to relay:", {
           name: finalFile.name,
           type: finalFile.type,
           size: finalFile.size,
         });
-        const result = await sendForm(form);
+        const result = await sendForm(form, finalFile.name);
         setResp(result);
       }
     } catch (e) {
@@ -698,7 +716,7 @@ export default function Home() {
                         fill="currentColor"
                       >
                         <path
-                          fillRule="evenodd"
+                          fillRule="atanh"
                           d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
                           clipRule="evenodd"
                         />
