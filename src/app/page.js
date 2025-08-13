@@ -381,11 +381,9 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [resp, setResp] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const fileRef = useRef(null);
 
-  // Your n8n webhook URL (Webhook node's Field Name for Binary Data = "file")
   const N8N_WEBHOOK =
     "https://wsi-utopiads.app.n8n.cloud/webhook-test/dfef9d24-252b-477b-a37b-03c69a4efd28";
 
@@ -432,7 +430,6 @@ export default function Home() {
 
   async function sendForm(file) {
     const form = new FormData();
-    // This field name must match "Field Name for Binary Data" in n8n Webhook node
     form.append("data", file);
 
     const r = await fetch(N8N_WEBHOOK, {
@@ -440,15 +437,7 @@ export default function Home() {
       body: form,
     });
 
-    const headers = Object.fromEntries(r.headers.entries());
-    const text = await r.text();
-    console.log("Webhook response:", { status: r.status, headers, text });
-
-    try {
-      return { ok: r.ok, status: r.status, data: JSON.parse(text) };
-    } catch {
-      return { ok: r.ok, status: r.status, data: { raw: text } };
-    }
+    return r.ok;
   }
 
   const handleFileChange = (e) => {
@@ -458,7 +447,6 @@ export default function Home() {
 
   async function handleSubmit() {
     setLoading(true);
-    setResp(null);
     try {
       if (!selectedFile) throw new Error("No file selected");
       if (selectedFile.size > 10 * 1024 * 1024) {
@@ -477,14 +465,12 @@ export default function Home() {
         );
       }
 
-      const result = await sendForm(finalFile);
-      setResp(result);
+      await sendForm(finalFile);
+      alert("File uploaded successfully!");
+      setSelectedFile(null);
+      fileRef.current.value = "";
     } catch (e) {
-      setResp({
-        ok: false,
-        status: 0,
-        data: { error: e?.message || String(e) },
-      });
+      alert(e?.message || String(e));
     } finally {
       setLoading(false);
     }
@@ -498,53 +484,78 @@ export default function Home() {
             <h1 className="text-3xl font-bold text-gray-800 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               Utility Bill Uploader
             </h1>
-            <p className="mt-2 text-gray-600">Upload a PDF/TXT file</p>
+            <p className="mt-2 text-gray-600">Upload a PDF or TXT file</p>
           </div>
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Upload File
-              </label>
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50"
+              onClick={() => fileRef.current?.click()}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M7 16V4m0 0l-4 4m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"
+                />
+              </svg>
+              <p className="mt-2 text-sm text-gray-600">
+                Click to select a file
+              </p>
               <input
-                id="file-upload"
                 ref={fileRef}
                 type="file"
                 accept=".pdf,.txt"
                 onChange={handleFileChange}
+                className="hidden"
               />
               {selectedFile && (
-                <div className="mt-2">
-                  <p className="text-sm font-medium text-gray-700">
-                    Selected file: {selectedFile.name}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                </div>
+                <p className="mt-2 text-sm text-gray-700">
+                  {selectedFile.name}{" "}
+                  <span className="text-gray-500">
+                    ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
+                </p>
               )}
             </div>
+
             <button
               onClick={handleSubmit}
               disabled={loading || !selectedFile}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-70"
+              className="w-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-70"
             >
+              {loading && (
+                <svg
+                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v8H4z"
+                  ></path>
+                </svg>
+              )}
               {loading ? "Uploading..." : "Upload File"}
             </button>
           </div>
-
-          {resp && (
-            <div className="mt-8">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Response
-              </h3>
-              <div className="bg-gray-50 p-4 rounded-lg overflow-x-auto">
-                <pre className="text-sm text-gray-800">
-                  {JSON.stringify(resp, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </main>
