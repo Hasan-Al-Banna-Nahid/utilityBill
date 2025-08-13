@@ -433,7 +433,7 @@ export default function Home() {
   async function sendForm(file) {
     const form = new FormData();
     // This field name must match "Field Name for Binary Data" in n8n Webhook node
-    form.append("data", file, file.name);
+    form.append("file", file, file.name);
 
     const r = await fetch(N8N_WEBHOOK, {
       method: "POST",
