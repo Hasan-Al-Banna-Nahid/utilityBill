@@ -373,6 +373,7 @@
 //   );
 // }
 
+// app/page.js
 "use client";
 
 import { useState, useRef } from "react";
@@ -386,6 +387,7 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState(null);
   const fileRef = useRef(null);
 
+  // IMPORTANT: point to your own API relay to bypass CORS
   const N8N_WEBHOOK =
     "https://wsi-utopiads.app.n8n.cloud/webhook/937e979c-46d4-469f-9d3c-98283cfbb628";
 
@@ -417,7 +419,6 @@ export default function Home() {
     const words = text.replace(/\r\n/g, "\n").split(/\s+/);
     let line = "";
     let y = height - margin;
-
     const widthOf = (s) => font.widthOfTextAtSize(s, fontSize);
 
     for (const w of words) {
@@ -432,9 +433,7 @@ export default function Home() {
         });
         y -= fontSize * 1.4;
         line = w;
-      } else {
-        line = test;
-      }
+      } else line = test;
     }
     if (line)
       page.drawText(line, {
@@ -454,37 +453,29 @@ export default function Home() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Accept: "application/json, text/plain, */*",
+        Accept: "application/json",
       },
       body: JSON.stringify(payload),
-      mode: "cors",
     });
     const text = await r.text();
     try {
-      return { ok: r.ok, data: JSON.parse(text) };
+      return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
-      return { ok: r.ok, data: { raw: text } };
+      return { ok: r.ok, status: r.status, data: { raw: text } };
     }
   }
 
   async function sendForm(form) {
-    const r = await fetch(N8N_WEBHOOK, {
-      method: "POST",
-      body: form, // do NOT set Content-Type manually
-      mode: "cors",
-    });
+    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: form }); // don't set Content-Type
     const text = await r.text();
     try {
-      return { ok: r.ok, data: JSON.parse(text) };
+      return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
-      return { ok: r.ok, data: { raw: text } };
+      return { ok: r.ok, status: r.status, data: { raw: text } };
     }
   }
 
-  const handleFileChange = (e) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
-  };
+  const handleFileChange = (e) => setSelectedFile(e.target.files?.[0] || null);
 
   async function handleSubmit(kind) {
     setLoading(true);
@@ -493,11 +484,11 @@ export default function Home() {
       if (kind === "url") {
         if (!url) throw new Error("No URL provided");
         const normalized = normalizeDrive(url);
-        console.log("Sending JSON to n8n:", {
+        console.log("Sending JSON to relay:", {
           url: normalized,
           source: "client",
         });
-        const result = await sendJson({ url: normalized }); // n8n → items[0].json.url
+        const result = await sendJson({ url: normalized, source: "client" });
         setResp(result);
       } else {
         const file = fileRef.current?.files?.[0];
@@ -513,8 +504,8 @@ export default function Home() {
         }
 
         const form = new FormData();
-        form.append("file", finalFile, finalFile.name); // n8n → items[0].binary.file
-        console.log("Sending multipart to n8n:", {
+        form.append("file", finalFile, finalFile.name);
+        console.log("Sending multipart to relay:", {
           name: finalFile.name,
           type: finalFile.type,
           size: finalFile.size,
@@ -523,7 +514,11 @@ export default function Home() {
         setResp(result);
       }
     } catch (e) {
-      setResp({ ok: false, data: { error: e?.message || String(e) } });
+      setResp({
+        ok: false,
+        status: 0,
+        data: { error: e?.message || String(e) },
+      });
     } finally {
       setLoading(false);
     }
@@ -538,7 +533,7 @@ export default function Home() {
               Utility Bill Uploader
             </h1>
             <p className="mt-2 text-gray-600">
-              Upload your PDF/TXT file or paste a link (Google Drive supported)
+              Upload a PDF/TXT or paste a link (Google Drive supported)
             </p>
           </div>
 
@@ -588,33 +583,7 @@ export default function Home() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Processing...
-                  </span>
-                ) : (
-                  "Submit Link"
-                )}
+                {loading ? "Processing..." : "Submit Link"}
               </button>
             </div>
           )}
@@ -632,7 +601,6 @@ export default function Home() {
                       stroke="currentColor"
                       fill="none"
                       viewBox="0 0 48 48"
-                      aria-hidden="true"
                     >
                       <path
                         d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
@@ -679,33 +647,7 @@ export default function Home() {
                 disabled={loading || !selectedFile}
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {loading ? (
-                  <span className="flex items-center justify-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Uploading...
-                  </span>
-                ) : (
-                  "Upload File"
-                )}
+                {loading ? "Uploading..." : "Upload File"}
               </button>
             </div>
           )}
@@ -726,7 +668,6 @@ export default function Home() {
                     <div className="flex-shrink-0">
                       <svg
                         className="h-5 w-5 text-green-400"
-                        xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
                         fill="currentColor"
                       >
@@ -739,7 +680,7 @@ export default function Home() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-green-800">
-                        Success! Your file has been processed.
+                        Success! Your file/link has been processed.
                       </p>
                     </div>
                   </div>
@@ -750,7 +691,6 @@ export default function Home() {
                     <div className="flex-shrink-0">
                       <svg
                         className="h-5 w-5 text-red-400"
-                        xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
                         fill="currentColor"
                       >
@@ -763,7 +703,8 @@ export default function Home() {
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-red-800">
-                        Error: {resp.data?.error || "Something went wrong"}
+                        Error:{" "}
+                        {resp.data?.error || `HTTP ${resp.status || "network"}`}
                       </p>
                     </div>
                   </div>
