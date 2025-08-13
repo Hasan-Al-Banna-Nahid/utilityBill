@@ -403,7 +403,9 @@ export default function Home() {
 
       const id = u.searchParams.get("id");
       if (id) return `https://drive.google.com/uc?export=download&id=${id}`;
-    } catch {}
+    } catch {
+      return link;
+    }
     return link;
   }
 
@@ -449,6 +451,7 @@ export default function Home() {
   }
 
   async function sendJson(payload) {
+    console.log("Sending payload to webhook:", payload);
     const r = await fetch(N8N_WEBHOOK, {
       method: "POST",
       headers: {
@@ -458,6 +461,7 @@ export default function Home() {
       body: JSON.stringify(payload),
     });
     const text = await r.text();
+    console.log("Webhook response:", { status: r.status, text });
     try {
       return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
@@ -466,8 +470,12 @@ export default function Home() {
   }
 
   async function sendForm(form) {
-    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: form }); // don't set Content-Type
+    for (let [key, value] of form.entries()) {
+      console.log(`FormData entry: ${key}=${value.name || value}`);
+    }
+    const r = await fetch(N8N_WEBHOOK, { method: "POST", body: form });
     const text = await r.text();
+    console.log("Webhook response:", { status: r.status, text });
     try {
       return { ok: r.ok, status: r.status, data: JSON.parse(text) };
     } catch {
@@ -475,7 +483,23 @@ export default function Home() {
     }
   }
 
-  const handleFileChange = (e) => setSelectedFile(e.target.files?.[0] || null);
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setSelectedFile(file);
+    if (file && fileRef.current) {
+      fileRef.current.value = ""; // Clear the input after selecting
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setUrl(""); // Clear URL
+    setSelectedFile(null); // Clear file
+    if (fileRef.current) {
+      fileRef.current.value = ""; // Clear file input
+    }
+    setResp(null); // Clear response
+  };
 
   async function handleSubmit(kind) {
     setLoading(true);
@@ -491,20 +515,22 @@ export default function Home() {
         const result = await sendJson({ url: normalized, source: "client" });
         setResp(result);
       } else {
-        const file = fileRef.current?.files?.[0];
-        if (!file) throw new Error("No file selected");
+        if (!selectedFile) throw new Error("No file selected");
 
-        let finalFile = file;
-        if (file.type !== "application/pdf" && /\.txt$/i.test(file.name)) {
-          const text = await file.text();
+        let finalFile = selectedFile;
+        if (
+          selectedFile.type !== "application/pdf" &&
+          /\.txt$/i.test(selectedFile.name)
+        ) {
+          const text = await selectedFile.text();
           finalFile = await textToPdfFile(
             text,
-            file.name.replace(/\.txt$/i, "") + ".pdf"
+            selectedFile.name.replace(/\.txt$/i, "") + ".pdf"
           );
         }
 
         const form = new FormData();
-        form.append("file", finalFile, finalFile.name);
+        form.append("file", finalFile, finalFile.name); // Adjust field name if n8n expects something else
         console.log("Sending multipart to relay:", {
           name: finalFile.name,
           type: finalFile.type,
@@ -544,7 +570,7 @@ export default function Home() {
                   ? "border-b-2 border-blue-500 text-blue-600"
                   : "text-gray-500 hover:text-gray-700"
               }`}
-              onClick={() => setActiveTab("url")}
+              onClick={() => handleTabChange("url")}
             >
               Submit Link
             </button>
@@ -554,7 +580,7 @@ export default function Home() {
                   ? "border-b-2 border-blue-500 text-blue-600"
                   : "text-gray-500 hover:text-gray-700"
               }`}
-              onClick={() => setActiveTab("file")}
+              onClick={() => handleTabChange("file")}
             >
               Upload File
             </button>
