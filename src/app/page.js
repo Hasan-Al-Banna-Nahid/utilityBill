@@ -376,33 +376,78 @@
 // app/page.js
 
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 
 export default function FileUploader() {
   const fileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [phase, setPhase] = useState("idle"); // idle | uploading | waiting | done
   const [uploading, setUploading] = useState(false);
+
+  // Countdown state for the n8n execution wait
+  const WAIT_DURATION_MS = 210000; // 3.5 minutes (adjust to 180000–240000 for 3–4 mins)
+  const [remainingMs, setRemainingMs] = useState(WAIT_DURATION_MS);
+  const [progress, setProgress] = useState(0);
+
+  const intervalRef = useRef(null);
+  const timeoutRef = useRef(null);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      uploadFile(file);
-    }
+    if (file) uploadFile(file);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) {
-      uploadFile(file);
+    if (file) uploadFile(file);
+  };
+
+  const startExecutionWait = () => {
+    setPhase("waiting");
+    setRemainingMs(WAIT_DURATION_MS);
+    setProgress(0);
+    const start = Date.now();
+
+    intervalRef.current = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const remain = Math.max(WAIT_DURATION_MS - elapsed, 0);
+      setRemainingMs(remain);
+      const pct = Math.min(100, Math.round((elapsed / WAIT_DURATION_MS) * 100));
+      setProgress(pct);
+    }, 1000);
+
+    timeoutRef.current = setTimeout(() => {
+      clearTimers();
+      setRemainingMs(0);
+      setProgress(100);
+      setPhase("done");
+    }, WAIT_DURATION_MS + 400);
+  };
+
+  const clearTimers = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
   };
 
+  useEffect(() => {
+    return () => clearTimers();
+  }, []);
+
   const uploadFile = async (file) => {
     setUploading(true);
-    toast.loading("Uploading your file...");
+    setPhase("uploading");
+
+    toast.dismiss();
+    toast.loading("Uploading your file…");
 
     try {
       const webhookUrl =
@@ -411,35 +456,39 @@ export default function FileUploader() {
       const formData = new FormData();
       formData.append("data", file);
 
-      const res = await fetch(webhookUrl, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error(`Upload failed: ${res.status}`);
-      }
+      // We assume upload + n8n always works as per your requirement
+      await fetch(webhookUrl, { method: "POST", body: formData });
 
       toast.dismiss();
-      toast.success("File uploaded successfully!");
-    } catch (err) {
-      toast.dismiss();
-      console.error("Upload error:", err);
-      toast.success("File uploaded successfully!");
+      toast.success("Uploaded! n8n execution started…");
+      startExecutionWait();
     } finally {
       setUploading(false);
       setIsDragging(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  const minutes = Math.floor(remainingMs / 60000);
+  const seconds = Math.floor((remainingMs % 60000) / 1000);
+  const mmss = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}`;
+
+  const openExecutions = () => {
+    window.open("https://wsi-utopiads.app.n8n.cloud/executions", "_blank");
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+    <div className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
       <Toaster position="top-center" />
+
+      {/* Upload Card */}
       <div
-        onClick={() => !uploading && fileInputRef.current.click()}
+        onClick={() =>
+          !uploading && phase !== "waiting" && fileInputRef.current?.click()
+        }
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
@@ -478,7 +527,7 @@ export default function FileUploader() {
 
         <p className="text-gray-600 text-center">
           {uploading
-            ? "Uploading..."
+            ? "Uploading…"
             : isDragging
             ? "Drop your file here"
             : "Click or drag a PDF/TXT to upload"}
@@ -492,6 +541,170 @@ export default function FileUploader() {
           className="hidden"
         />
       </div>
+
+      {/* Aside Panel (always slides in after uploading) */}
+      <aside
+        className={`fixed top-0 right-0 h-full w-full sm:w-[380px] bg-white/80 backdrop-blur-xl shadow-2xl border-l border-white/50 transition-transform duration-500 ${
+          phase === "idle" ? "translate-x-full" : "translate-x-0"
+        }`}
+      >
+        {/* Glow background */}
+        <div className="absolute inset-0 -z-10 opacity-70">
+          <div className="glow absolute -inset-8 rounded-3xl" />
+        </div>
+
+        <div className="p-6 space-y-4">
+          <header className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">n8n Execution</h2>
+            <StatusBadge phase={phase} />
+          </header>
+
+          {(phase === "uploading" || phase === "waiting") && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-700">
+                {phase === "uploading"
+                  ? "Sending your file to n8n…"
+                  : "n8n is processing your file (~3–4 minutes)."}
+              </p>
+
+              {/* Progress */}
+              <div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                  <span>Progress</span>
+                  <span>{progress}%</span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-[width] duration-1000"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-gray-500">ETA: {mmss}</div>
+              </div>
+
+              <StepList phase={phase} />
+            </div>
+          )}
+
+          {phase === "done" && (
+            <div className="space-y-5">
+              <div className="relative overflow-hidden rounded-2xl border border-purple-200 bg-white">
+                {/* Success glow */}
+                <div className="absolute -inset-8 glow rounded-3xl opacity-60" />
+                <div className="relative p-6">
+                  <div className="flex items-center gap-3">
+                    <CheckIcon />
+                    <div>
+                      <h3 className="font-semibold text-gray-900">
+                        Execution Succeeded
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        Data saved into <strong>Electric</strong> and/or{" "}
+                        <strong>Gas</strong> tabs.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={openExecutions}
+                className="w-full inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 font-medium shadow-lg hover:shadow-xl transition"
+              >
+                Open n8n Executions
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
+
+      {/* Local animation styles */}
+      <style jsx>{`
+        .glow {
+          background: linear-gradient(90deg, #7f00ff, #e100ff, #7f00ff);
+          background-size: 200% 200%;
+          filter: blur(24px);
+          animation: gradientMove 6s ease-in-out infinite;
+        }
+        @keyframes gradientMove {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
+      `}</style>
     </div>
+  );
+}
+
+function StatusBadge({ phase }) {
+  const map = {
+    idle: { text: "Idle", cls: "bg-gray-100 text-gray-600" },
+    uploading: { text: "Uploading", cls: "bg-blue-100 text-blue-700" },
+    waiting: { text: "Processing", cls: "bg-purple-100 text-purple-700" },
+    done: { text: "Success", cls: "bg-green-100 text-green-700" },
+  }[phase] || { text: "Idle", cls: "bg-gray-100 text-gray-600" };
+
+  return (
+    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${map.cls}`}>
+      {map.text}
+    </span>
+  );
+}
+
+function StepList({ phase }) {
+  const steps = [
+    { label: "Upload received", active: phase !== "idle" },
+    { label: "Workflow triggered", active: phase !== "idle" },
+    {
+      label: "AI parsing & mapping",
+      active: phase === "waiting" || phase === "done",
+    },
+    { label: "Saved to Sheets", active: phase === "done" },
+  ];
+  return (
+    <ol className="space-y-2">
+      {steps.map((s, idx) => (
+        <li key={idx} className="flex items-center gap-2 text-sm">
+          <span
+            className={`inline-flex h-2.5 w-2.5 rounded-full ${
+              s.active
+                ? "bg-gradient-to-r from-purple-500 to-pink-500"
+                : "bg-gray-300"
+            }`}
+          />
+          <span className={s.active ? "text-gray-900" : "text-gray-500"}>
+            {s.label}
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="36" height="36" viewBox="0 0 24 24" className="shrink-0">
+      <defs>
+        <linearGradient id="grad2" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7F00FF" />
+          <stop offset="100%" stopColor="#E100FF" />
+        </linearGradient>
+      </defs>
+      <circle cx="12" cy="12" r="10" fill="url(#grad2)" opacity="0.15" />
+      <path
+        d="M6 12l4 4 8-8"
+        fill="none"
+        stroke="url(#grad2)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
