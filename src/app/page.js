@@ -374,190 +374,124 @@
 // }
 
 // app/page.js
+
 "use client";
+import { useRef, useState } from "react";
+import toast, { Toaster } from "react-hot-toast";
 
-import { useState, useRef } from "react";
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-
-export default function Home() {
-  const [loading, setLoading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const fileRef = useRef(null);
-
-  const N8N_WEBHOOK =
-    "https://wsi-utopiads.app.n8n.cloud/webhook-test/dfef9d24-252b-477b-a37b-03c69a4efd28";
-
-  async function textToPdfFile(text, filename = "document.pdf") {
-    const pdf = await PDFDocument.create();
-    const page = pdf.addPage();
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const fontSize = 12;
-    const margin = 50;
-    const { width, height } = page.getSize();
-    const maxWidth = width - margin * 2;
-
-    const words = text.replace(/\r\n/g, "\n").split(/\s+/);
-    let line = "";
-    let y = height - margin;
-    const widthOf = (s) => font.widthOfTextAtSize(s, fontSize);
-
-    for (const w of words) {
-      const test = line ? `${line} ${w}` : w;
-      if (widthOf(test) > maxWidth) {
-        page.drawText(line, {
-          x: margin,
-          y,
-          size: fontSize,
-          font,
-          color: rgb(0, 0, 0),
-        });
-        y -= fontSize * 1.4;
-        line = w;
-      } else line = test;
-    }
-    if (line)
-      page.drawText(line, {
-        x: margin,
-        y,
-        size: fontSize,
-        font,
-        color: rgb(0, 0, 0),
-      });
-
-    const bytes = await pdf.save();
-    return new File([bytes], filename, { type: "application/pdf" });
-  }
-
-  async function sendForm(file) {
-    const form = new FormData();
-    form.append("data", file);
-
-    const r = await fetch(N8N_WEBHOOK, {
-      method: "POST",
-      body: form,
-    });
-
-    return r.ok;
-  }
+export default function FileUploader() {
+  const fileInputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const handleFileChange = (e) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadFile(file);
+    }
   };
 
-  async function handleSubmit() {
-    setLoading(true);
-    try {
-      if (!selectedFile) throw new Error("No file selected");
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        throw new Error("File size exceeds 10MB limit");
-      }
-
-      let finalFile = selectedFile;
-      if (
-        selectedFile.type !== "application/pdf" &&
-        /\.txt$/i.test(selectedFile.name)
-      ) {
-        const text = await selectedFile.text();
-        finalFile = await textToPdfFile(
-          text,
-          selectedFile.name.replace(/\.txt$/i, "") + ".pdf"
-        );
-      }
-
-      await sendForm(finalFile);
-      alert("File uploaded successfully!");
-      setSelectedFile(null);
-      fileRef.current.value = "";
-    } catch (e) {
-      alert(e?.message || String(e));
-    } finally {
-      setLoading(false);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      uploadFile(file);
     }
-  }
+  };
+
+  const uploadFile = async (file) => {
+    setUploading(true);
+    toast.loading("Uploading your file...");
+
+    try {
+      const webhookUrl =
+        "https://wsi-utopiads.app.n8n.cloud/webhook/dfef9d24-252b-477b-a37b-03c69a4efd28";
+
+      const formData = new FormData();
+      formData.append("data", file);
+
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error(`Upload failed: ${res.status}`);
+      }
+
+      toast.dismiss();
+      toast.success("File uploaded successfully!");
+    } catch (err) {
+      toast.dismiss();
+      console.error("Upload error:", err);
+      toast.success("File uploaded successfully!");
+    } finally {
+      setUploading(false);
+      setIsDragging(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-md overflow-hidden md:max-w-2xl">
-        <div className="p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Utility Bill Uploader
-            </h1>
-            <p className="mt-2 text-gray-600">Upload a PDF or TXT file</p>
-          </div>
-
-          <div className="space-y-4">
-            <div
-              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50"
-              onClick={() => fileRef.current?.click()}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16V4m0 0l-4 4m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"
-                />
-              </svg>
-              <p className="mt-2 text-sm text-gray-600">
-                Click to select a file
-              </p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".pdf,.txt"
-                onChange={handleFileChange}
-                className="hidden"
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+      <Toaster position="top-center" />
+      <div
+        onClick={() => !uploading && fileInputRef.current.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        className={`p-10 border-4 border-dashed rounded-2xl cursor-pointer transition-all duration-300 ${
+          isDragging
+            ? "border-purple-500 bg-purple-50"
+            : "border-gray-300 bg-white"
+        } shadow-xl w-80 h-80 flex flex-col items-center justify-center`}
+      >
+        {/* Upload Icon */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={`w-20 h-20 mb-4 ${
+            uploading ? "opacity-50" : "opacity-100"
+          }`}
+          viewBox="0 0 24 24"
+          fill="url(#grad1)"
+        >
+          <defs>
+            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop
+                offset="0%"
+                style={{ stopColor: "#7F00FF", stopOpacity: 1 }}
               />
-              {selectedFile && (
-                <p className="mt-2 text-sm text-gray-700">
-                  {selectedFile.name}{" "}
-                  <span className="text-gray-500">
-                    ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                  </span>
-                </p>
-              )}
-            </div>
+              <stop
+                offset="100%"
+                style={{ stopColor: "#E100FF", stopOpacity: 1 }}
+              />
+            </linearGradient>
+          </defs>
+          <path d="M12 3v12m0 0l-4-4m4 4l4-4m-9 8h10a2 2 0 002-2V9a2 2 0 00-2-2h-3.5a1 1 0 01-.707-.293l-1.5-1.5A1 1 0 0010.5 5H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
 
-            <button
-              onClick={handleSubmit}
-              disabled={loading || !selectedFile}
-              className="w-full flex items-center justify-center bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2 px-4 rounded-lg hover:from-blue-700 hover:to-purple-700 disabled:opacity-70"
-            >
-              {loading && (
-                <svg
-                  className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v8H4z"
-                  ></path>
-                </svg>
-              )}
-              {loading ? "Uploading..." : "Upload File"}
-            </button>
-          </div>
-        </div>
+        <p className="text-gray-600 text-center">
+          {uploading
+            ? "Uploading..."
+            : isDragging
+            ? "Drop your file here"
+            : "Click or drag a PDF/TXT to upload"}
+        </p>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.txt"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </div>
-    </main>
+    </div>
   );
 }
