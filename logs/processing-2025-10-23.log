@@ -1,0 +1,56 @@
+[2025-10-23T09:45:05.039Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T09:45:05.797Z] [INFO] Received 1 files for binary upload
+[2025-10-23T09:45:05.819Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T09:45:06.115Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T09:45:06.316Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T09:45:06.316Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T09:45:06.514Z] [INFO] === Binary file upload completed ===
+[2025-10-23T09:45:16.023Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:27:17.616Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:27:18.294Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:27:18.297Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:27:18.645Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:27:18.646Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:27:18.646Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:27:18.673Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:27:27.510Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:30:24.889Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:30:25.019Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:30:25.026Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:30:25.036Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:30:25.037Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:30:25.037Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:30:25.424Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:30:27.866Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:32:02.805Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:32:03.052Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:32:03.056Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:32:03.213Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:32:03.225Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:32:03.225Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:32:03.241Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:32:24.054Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:34:37.810Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:34:37.851Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:34:37.852Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:34:37.860Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:34:37.863Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:34:37.863Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:34:37.865Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:35:27.205Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:36:44.631Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:36:44.802Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:36:44.806Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:36:44.821Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:36:44.823Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:36:44.823Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:36:44.859Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:37:33.323Z] [ERROR] n8n webhook failed with status 500: {"message":"Error in workflow"}
+[2025-10-23T12:38:55.835Z] [INFO] === Starting binary file upload to n8n ===
+[2025-10-23T12:38:56.022Z] [INFO] Received 1 files for binary upload
+[2025-10-23T12:38:56.024Z] [INFO] Processing binary file: CPS 2025-07.pdf (1929043 bytes)
+[2025-10-23T12:38:56.044Z] [SUCCESS] Converted CPS 2025-07.pdf to binary ArrayBuffer (1929043 bytes)
+[2025-10-23T12:38:56.056Z] [SUCCESS] Binary upload completed: 1/1 successful, upload status: success
+[2025-10-23T12:38:56.055Z] [INFO] Sending 1 binary files to n8n webhook
+[2025-10-23T12:38:56.060Z] [INFO] === Binary file upload completed ===
+[2025-10-23T12:39:48.353Z] [ERROR] n8n webhook failed with status 500: {"code":0,"message":"No binary data was found to return","stacktrace":"Error: No binary data was found to return\n    at extractFirstEntryBinaryFromTaskData (/usr/lib/node_modules/n8n/src/webhooks/webhook-last-node-response-extractor.ts:99:28)\n    at extractWebhookLastNodeResponse (/usr/lib/node_modules/n8n/src/webhooks/webhook-last-node-response-extractor.ts:37:16)\n    at /usr/lib/node_modules/n8n/src/webhooks/webhook-helpers.ts:722:57"}

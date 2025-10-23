@@ -8,7 +8,6 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "mkdir -p public && cp node_modules/pdfjs-dist/build/pdf.worker.min.mjs public/pdf.worker.min.mjs || echo 'skip copy'"
-
   },
   "dependencies": {
     "framer-motion": "^12.23.9",
@@ -22,6 +21,8 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "tailwindcss": "^4"
+    "@types/react": "19.2.2",
+    "tailwindcss": "^4",
+    "typescript": "5.9.3"
   }
 }
