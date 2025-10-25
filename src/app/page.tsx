@@ -127,7 +127,7 @@ export default function EnhancedFileUploader() {
 
   const openOutputSheet = () => {
     window.open(
-      "https://docs.google.com/spreadsheets/d/1lNrqHX1c93VI7cZz84Fqrd4KJ5PZcXtYJShWGE1XU4o",
+      "https://docs.google.com/spreadsheets/d/1lNrqHX1c93VI7cZz84Fqrd4KJ5PZcXtYJShWGE1XU4o/edit?usp=sharing",
       "_blank"
     );
   };
